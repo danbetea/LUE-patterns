@@ -1,7 +1,7 @@
 ## LUE-patterns
 Regression on LUE eigenvalues
 
-We implement [Anna Maltsev's](https://webspace.maths.qmul.ac.uk/a.maltsev/) idea of fitting a linear model (doing linear regression) on the Laguerre Unitary Ensemble eigenvalues for a fixed parameter $\alpha$ ($=4$ in this case). More details are at the beginning of each notebook. 
+We implement [Anna Maltsev's](https://webspace.maths.qmul.ac.uk/a.maltsev/) idea of fitting a linear model (doing linear regression) on the Laguerre Unitary Ensemble (LUE) eigenvalues for a fixed LUE parameter $\alpha = 4$. More details are at the beginning of each notebook. 
 
 **Some remarks:**
 
