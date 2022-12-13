@@ -30,7 +30,15 @@ and we additionally consider two cases for splitting the data into training and 
 - first we try 60%-40%, and
 - then we try 80%-20%.
 
-**Important remark:** The dependent variable $x = (\log i)_{m_0 \leq i \leq m_0+M}$ is deterministic.
+One we have variables $y_i^{train}$ and $y_i^{test}$, computing the $R^2$ coefficient (metric) becomes a matter of choice. We compute three such coefficients: on the training set only, on the test set only, and out-of-sample on the train and test set as follows:
+
+$$R^2_{train} = 1 - \frac{\sum_i (y_i^{train} - \hat{y}_i^{train})^2}{\sum_i (y_i^{train} - \bar{y}^{train})^2}, \qquad
+R^2_{test} = 1 - \frac{\sum_i (y_i^{test} - \hat{y}_i^{test})^2}{\sum_i (y_i^{test} - \bar{y}^{test})^2}, \qquad
+R^2_{oos} = 1 - \frac{\sum_i (y_i^{test} - \hat{y}_i^{test})^2}{\sum_i (y_i^{test} - \bar{y}^{train})^2}$$
+
+and the reason for $R^2_{oos}$ is the following: we check the test set performance against the benchmark *non-prediction model* we see on the training/fitted set, which is the model which outputs the mean of the training set $\bar{y}^{train}$ no matter the data.
+
+**Important remark:** The dependent variable $x = (\log i)_{m_0 \leq i \leq m_0+M}$ is deterministic, so $\hat{y}^{train} = \hat{y}^{test}$ using our setup.
 
 **Some other remarks:**
 
@@ -88,15 +96,23 @@ for N in Ns
     println("R squared on the training set is: ", r2(reg))
     println()
     
-    # compute R^2 on the test set (see e.g. Wikipedia article)
-    SS_tot = sum((log_expectations_test .- mean(log_expectations_test)).^2)
-    SS_res = sum((log_expectations_test .- (coef(reg)[1] .+ coef(reg)[2] .* log_ms)).^2)
-    r2_test = 1 - SS_res/SS_tot
+    # compute R^2 on the test set (see e.g. Wikipedia article), naively
+    SS_tot_test = sum((log_expectations_test .- mean(log_expectations_test)).^2)
+    SS_res_test = sum((log_expectations_test .- (coef(reg)[1] .+ coef(reg)[2] .* log_ms)).^2)
+    r2_test = 1 - SS_res_test/SS_tot_test
     
-    println("R squared on the test set is: ", r2_test)
+    println("R squared (naive) on the test set is: ", r2_test)
+    println()
+    
+    # compute out-of-sample OOS R^2, against predicted y_bar on the training set ! on the test set (see e.g. Wikipedia article), naively
+    SS_tot_train_test = sum((log_expectations_test .- mean(log_expectations_train)).^2)
+    r2_oos = 1 - SS_res_test/SS_tot_train_test
+    
+    println("R squared (out-of-sample) on the test set is: ", r2_oos)
     println("\n--------------------------------------------------------------------------\n")
     
-    coeff_dict[string(N)] = Dict([("b0", coef(reg)[1]), ("b1", coef(reg)[2]), ("r2", r2(reg))])
+    coeff_dict[string(N)] = Dict([("b0", coef(reg)[1]), ("b1", coef(reg)[2]), 
+            ("r2_train", r2(reg)), ("r2_test", r2_test), ("r2_oos", r2_oos)])
 end
 ```
 
@@ -121,7 +137,9 @@ end
     
     R squared on the training set is: 0.9997252840928547
     
-    R squared on the test set is: 0.9996010133806793
+    R squared (naive) on the test set is: 0.9996010133806793
+    
+    R squared (out-of-sample) on the test set is: 0.9996010244247339
     
     --------------------------------------------------------------------------
     
@@ -146,7 +164,9 @@ end
     
     R squared on the training set is: 0.9996525781321135
     
-    R squared on the test set is: 0.9995437008969466
+    R squared (naive) on the test set is: 0.9995437008969466
+    
+    R squared (out-of-sample) on the test set is: 0.9995437012847317
     
     --------------------------------------------------------------------------
     
@@ -171,7 +191,9 @@ end
     
     R squared on the training set is: 0.9997641013695571
     
-    R squared on the test set is: 0.9986867445554634
+    R squared (naive) on the test set is: 0.9986867445554634
+    
+    R squared (out-of-sample) on the test set is: 0.9986867990895594
     
     --------------------------------------------------------------------------
     
@@ -216,15 +238,23 @@ for N in Ns
     println("R squared on the training set is: ", r2(reg))
     println()
     
-    # compute R^2 on the test set (see e.g. Wikipedia article)
-    SS_tot = sum((log_expectations_test .- mean(log_expectations_test)).^2)
-    SS_res = sum((log_expectations_test .- (coef(reg)[1] .+ coef(reg)[2] .* log_ms)).^2)
-    r2_test = 1 - SS_res/SS_tot
+    # compute R^2 on the test set (see e.g. Wikipedia article), naively
+    SS_tot_test = sum((log_expectations_test .- mean(log_expectations_test)).^2)
+    SS_res_test = sum((log_expectations_test .- (coef(reg)[1] .+ coef(reg)[2] .* log_ms)).^2)
+    r2_test = 1 - SS_res_test/SS_tot_test
     
-    println("R squared on the test set is: ", r2_test)
+    println("R squared (naive) on the test set is: ", r2_test)
+    println()
+    
+    # compute out-of-sample OOS R^2, against predicted y_bar on the training set ! on the test set (see e.g. Wikipedia article), naively
+    SS_tot_train_test = sum((log_expectations_test .- mean(log_expectations_train)).^2)
+    r2_oos = 1 - SS_res_test/SS_tot_train_test
+    
+    println("R squared (out-of-sample) on the test set is: ", r2_oos)
     println("\n--------------------------------------------------------------------------\n")
     
-    coeff_dict_2[string(N)] = Dict([("b0", coef(reg)[1]), ("b1", coef(reg)[2]), ("r2", r2(reg))])
+    coeff_dict[string(N)] = Dict([("b0", coef(reg)[1]), ("b1", coef(reg)[2]), 
+            ("r2_train", r2(reg)), ("r2_test", r2_test), ("r2_oos", r2_oos)])
 end
 ```
 
@@ -249,7 +279,9 @@ end
     
     R squared on the training set is: 0.9997278908057867
     
-    R squared on the test set is: 0.9993046075393165
+    R squared (naive) on the test set is: 0.9993046075393165
+    
+    R squared (out-of-sample) on the test set is: 0.9993046167559674
     
     --------------------------------------------------------------------------
     
@@ -274,7 +306,9 @@ end
     
     R squared on the training set is: 0.9996063762935677
     
-    R squared on the test set is: 0.9996495122867071
+    R squared (naive) on the test set is: 0.9996495122867071
+    
+    R squared (out-of-sample) on the test set is: 0.9996495175602309
     
     --------------------------------------------------------------------------
     
@@ -299,7 +333,9 @@ end
     
     R squared on the training set is: 0.9996381045595585
     
-    R squared on the test set is: 0.9996484001983278
+    R squared (naive) on the test set is: 0.9996484001983278
+    
+    R squared (out-of-sample) on the test set is: 0.9996484010579837
     
     --------------------------------------------------------------------------
     

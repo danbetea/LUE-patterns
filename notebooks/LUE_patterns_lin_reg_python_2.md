@@ -30,7 +30,15 @@ and we additionally consider two cases for splitting the data into training and 
 - first we try 60%-40%, and
 - then we try 80%-20%.
 
-**Important remark:** The dependent variable $x = (\log i)_{m_0 \leq i \leq m_0+M}$ is deterministic.
+One we have variables $y_i^{train}$ and $y_i^{test}$, computing the $R^2$ coefficient (metric) becomes a matter of choice. We compute three such coefficients: on the training set only, on the test set only, and out-of-sample on the train and test set as follows:
+
+$$R^2_{train} = 1 - \frac{\sum_i (y_i^{train} - \hat{y}_i^{train})^2}{\sum_i (y_i^{train} - \bar{y}^{train})^2}, \qquad
+R^2_{test} = 1 - \frac{\sum_i (y_i^{test} - \hat{y}_i^{test})^2}{\sum_i (y_i^{test} - \bar{y}^{test})^2}, \qquad
+R^2_{oos} = 1 - \frac{\sum_i (y_i^{test} - \hat{y}_i^{test})^2}{\sum_i (y_i^{test} - \bar{y}^{train})^2}$$
+
+and the reason for $R^2_{oos}$ is the following: we check the test set performance against the benchmark *non-prediction model* we see on the training/fitted set, which is the model which outputs the mean of the training set $\bar{y}^{train}$ no matter the data.
+
+**Important remark:** The dependent variable $x = (\log i)_{m_0 \leq i \leq m_0+M}$ is deterministic, so $\hat{y}^{train} = \hat{y}^{test}$ using our setup.
 
 **Some other remarks:**
 
@@ -181,7 +189,7 @@ for N in Ns:
     -------------------------------------------------------------------------
 
 
-#### Training phase
+#### Training (followed by testing)
 
 The actual regression goes down below. First the training phase to get the regression line.
 
@@ -195,88 +203,63 @@ reg_dict = {} # dictionary to hold the regressors
 # str(N): {"b0": ..., "b1": ..., "r2": ...}
 # with b0 = intercept, b1 = slope, r2 = R squared
 coeff_dict = {str(N) : {} for N in Ns} 
-print("\n Training phase ")
-print("\n----------------")
 for N in Ns:
     print(f"\n N = {N}\n")
     log_expectations_train = log_expectations_train_dict[str(N)]
+    log_expectations_test = log_expectations_test_dict[str(N)]
     reg_dict[str(N)] = linear_model.LinearRegression()
     reg_dict[str(N)].fit(log_ms, log_expectations_train) # linear fit
     reg = reg_dict[str(N)]
-    print(f" slope:     {reg.coef_.item()}\n intercept: {reg.intercept_.item()}\n R squared: \
- {reg.score(log_ms, log_expectations_train)}")
+    
+    # computing R^2 for train and test (naive)
+    r2_train = reg.score(log_ms, log_expectations_train)
+    r2_test = reg.score(log_ms, log_expectations_test)
+    # computing the R^2 out-of-sample coefficient
+    SS_tot_train_test = np.sum((log_expectations_test - np.mean(log_expectations_train))**2)
+    SS_res_test = np.sum((log_expectations_test - (reg.intercept_.item() + reg.coef_.item() * log_ms))**2)
+    r2_oos = 1 - SS_res_test/SS_tot_train_test
+     
+    print(f" slope:             {reg.coef_.item()}")
+    print(f" intercept:         {reg.intercept_.item()}")
+    print(f" R squared (train):  {r2_train}")
+    print(f" R squared (test):   {r2_test}")
+    print(f" R squared (oos):    {r2_oos}")
     coeff_dict[str(N)]["b0"] = reg.coef_.item()
     coeff_dict[str(N)]["b1"] = reg.intercept_.item()
-    coeff_dict[str(N)]["r2"] = reg.score(log_ms, log_expectations_train)
+    coeff_dict[str(N)]["r2_train"] = r2_train
+    coeff_dict[str(N)]["r2_test"] = r2_test
+    coeff_dict[str(N)]["r2_oos"] = r2_oos
     print("\n"+73*"-")
 ```
 
     
-     Training phase 
-    
-    ----------------
-    
      N = 1000
     
-     slope:     -3.5565342748568156
-     intercept: 10.640085997010413
-     R squared:  0.9997252840928547
+     slope:             -3.5565342748568156
+     intercept:         10.640085997010413
+     R squared (train):  0.9997252840928547
+     R squared (test):   0.9996010133806793
+     R squared (oos):    0.9996010244247339
     
     -------------------------------------------------------------------------
     
      N = 5000
     
-     slope:     -3.524984873534735
-     intercept: 13.780306377117752
-     R squared:  0.9996525781321135
+     slope:             -3.524984873534735
+     intercept:         13.780306377117752
+     R squared (train):  0.9996525781321135
+     R squared (test):   0.9995437008969466
+     R squared (oos):    0.9995437012847317
     
     -------------------------------------------------------------------------
     
      N = 10000
     
-     slope:     -3.560837784875215
-     intercept: 15.241066745513617
-     R squared:  0.9997641013695571
-    
-    -------------------------------------------------------------------------
-
-
-#### Testing phase
-
-Now we do the predicting phase. Note the $R^2$ coefficient continues to be high.
-
-
-```python
-print("\n Predicting phase ")
-print("\n------------------")
-for N in Ns:
-    print(f"\n N = {N}\n")
-    reg = reg_dict[str(N)]
-    log_expectations_test = log_expectations_test_dict[str(N)]
-    print(" R squared on the test set: ", reg.score(log_ms, log_expectations_test))
-    print("\n"+73*"-")
-```
-
-    
-     Predicting phase 
-    
-    ------------------
-    
-     N = 1000
-    
-     R squared on the test set:  0.9996010133806793
-    
-    -------------------------------------------------------------------------
-    
-     N = 5000
-    
-     R squared on the test set:  0.9995437008969466
-    
-    -------------------------------------------------------------------------
-    
-     N = 10000
-    
-     R squared on the test set:  0.9986867445554635
+     slope:             -3.560837784875215
+     intercept:         15.241066745513617
+     R squared (train):  0.9997641013695571
+     R squared (test):   0.9986867445554635
+     R squared (oos):    0.9986867990895595
     
     -------------------------------------------------------------------------
 
@@ -382,7 +365,7 @@ for N in Ns:
     -------------------------------------------------------------------------
 
 
-#### Training phase
+#### Training (followed by testing)
 
 
 ```python
@@ -391,87 +374,64 @@ reg_dict_2 = {} # dictionary to hold the regressors
 # below: dictionary to hold the coefficients of the regression in the form
 # str(N): {"b0": ..., "b1": ..., "r2": ...}
 # with b0 = intercept, b1 = slope, r2 = R squared
-coeff_dict_2 = {str(N) : {} for N in Ns} 
-print("\n Training phase ")
-print("\n----------------")
+coeff_dict_2 = {str(N) : {} for N in Ns}
 for N in Ns:
     print(f"\n N = {N}\n")
     log_expectations_train = log_expectations_train_dict_2[str(N)]
+    log_expectations_test = log_expectations_test_dict_2[str(N)]
     reg_dict_2[str(N)] = linear_model.LinearRegression()
     reg_dict_2[str(N)].fit(log_ms, log_expectations_train) # linear fit
     reg = reg_dict_2[str(N)]
-    print(f" slope:     {reg.coef_.item()}\n intercept: {reg.intercept_.item()}\n R squared: \
- {reg.score(log_ms, log_expectations_train)}")
-    coeff_dict_2[str(N)]["b0"] = reg.coef_.item()
-    coeff_dict_2[str(N)]["b1"] = reg.intercept_.item()
-    coeff_dict_2[str(N)]["r2"] = reg.score(log_ms, log_expectations_train)
+    
+    # computing R^2 for train and test (naive)
+    r2_train = reg.score(log_ms, log_expectations_train)
+    r2_test = reg.score(log_ms, log_expectations_test)
+    # computing the R^2 out-of-sample coefficient
+    SS_tot_train_test = np.sum((log_expectations_test - np.mean(log_expectations_train))**2)
+    SS_res_test = np.sum((log_expectations_test - (reg.intercept_.item() + reg.coef_.item() * log_ms))**2)
+    r2_oos = 1 - SS_res_test/SS_tot_train_test
+     
+    print(f" slope:             {reg.coef_.item()}")
+    print(f" intercept:         {reg.intercept_.item()}")
+    print(f" R squared (train):  {r2_train}")
+    print(f" R squared (test):   {r2_test}")
+    print(f" R squared (oos):    {r2_oos}")
+    coeff_dict[str(N)]["b0"] = reg.coef_.item()
+    coeff_dict[str(N)]["b1"] = reg.intercept_.item()
+    coeff_dict[str(N)]["r2_train"] = r2_train
+    coeff_dict[str(N)]["r2_test"] = r2_test
+    coeff_dict[str(N)]["r2_oos"] = r2_oos
     print("\n"+73*"-")
 ```
 
     
-     Training phase 
-    
-    ----------------
-    
      N = 1000
     
-     slope:     -3.556985804860991
-     intercept: 10.637124810312272
-     R squared:  0.9997278908057867
+     slope:             -3.556985804860991
+     intercept:         10.637124810312272
+     R squared (train):  0.9997278908057867
+     R squared (test):   0.9993046075393165
+     R squared (oos):    0.9993046167559675
     
     -------------------------------------------------------------------------
     
      N = 5000
     
-     slope:     -3.5184585909075796
-     intercept: 13.765136769385732
-     R squared:  0.9996063762935679
+     slope:             -3.5184585909075796
+     intercept:         13.765136769385732
+     R squared (train):  0.9996063762935679
+     R squared (test):   0.9996495122867071
+     R squared (oos):    0.9996495175602309
     
     -------------------------------------------------------------------------
     
      N = 10000
     
-     slope:     -3.525326475682311
-     intercept: 15.168079151939518
-     R squared:  0.9996381045595585
-    
-    -------------------------------------------------------------------------
-
-
-#### Testing phase
-
-
-```python
-print("\n Predicting phase ")
-print("\n------------------")
-for N in Ns:
-    print(f"\n N = {N}\n")
-    reg = reg_dict_2[str(N)]
-    log_expectations_test = log_expectations_test_dict_2[str(N)]
-    print(" R squared on the test set: ", reg.score(log_ms, log_expectations_test))
-    print("\n"+73*"-")
-```
-
-    
-     Predicting phase 
-    
-    ------------------
-    
-     N = 1000
-    
-     R squared on the test set:  0.9993046075393165
-    
-    -------------------------------------------------------------------------
-    
-     N = 5000
-    
-     R squared on the test set:  0.9996495122867071
-    
-    -------------------------------------------------------------------------
-    
-     N = 10000
-    
-     R squared on the test set:  0.9996484001983278
+     slope:             -3.525326475682311
+     intercept:         15.168079151939518
+     R squared (train):  0.9996381045595585
+     R squared (test):   0.9996484001983278
+     R squared (oos):    0.9996484010579837
     
     -------------------------------------------------------------------------
 
